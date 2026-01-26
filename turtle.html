@@ -88,34 +88,15 @@ turtle.forward(100)
     penDown = true;
   }
 
- async function forward(dist) {
-  const steps = Math.abs(dist);
-  const stepSize = dist / steps;
-  const rad = angle * Math.PI / 180;
+// --- Command queue (so Python stays simple) ---
+let queue = [];
+let delayMs = 10; // animation speed (smaller = faster)
 
-  for (let i = 0; i < steps; i++) {
-    const nx = x + Math.cos(rad) * stepSize;
-    const ny = y - Math.sin(rad) * stepSize;
-
-    if (penDown) {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(nx, ny);
-      ctx.stroke();
-    }
-
-    x = nx;
-    y = ny;
-
-    // pause so we can see movement
-    await new Promise(r => setTimeout(r, 10));
-  }
-}
-
-  function left(deg) { angle += deg; }
-  function right(deg) { angle -= deg; }
-  function penup() { penDown = false; }
-  function pendown() { penDown = true; }
+function forward(dist){ queue.push(["forward", dist]); }
+function left(deg){ queue.push(["left", deg]); }
+function right(deg){ queue.push(["right", deg]); }
+function penup(){ queue.push(["penup"]); }
+function pendown(){ queue.push(["pendown"]); }
 
   async function main() {
     try {
