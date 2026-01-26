@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Code Cadets Turtle</title>
 
-  <!-- Pyodide -->
   <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
 
   <style>
@@ -31,7 +30,7 @@
       cursor:pointer;
     }
     button:disabled { opacity:0.5; cursor:not-allowed; }
-    #toolbar { display:flex; gap:10px; margin:10px 0; flex-wrap:wrap; }
+    #toolbar { display:flex; gap:10px; margin:10px 0; flex-wrap:wrap; align-items:center; }
     #status { font-size:14px; }
   </style>
 </head>
@@ -54,9 +53,7 @@ turtle.forward(100)
         <span id="status">Loading Python…</span>
       </div>
 
-      <div style="font-size:12px; color:#555;">
-        Tip: This turtle draws on the canvas (right). Your tutorial code stays the same - no await needed.
-      </div>
+      <pre id="err" style="white-space:pre-wrap; background:#f6f6f6; border:1px solid #ddd; padding:10px; border-radius:10px; margin:0; min-height:70px;"></pre>
     </div>
 
     <canvas id="canvas" width="420" height="420"></canvas>
@@ -66,18 +63,15 @@ turtle.forward(100)
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
   const statusEl = document.getElementById("status");
+  const errEl = document.getElementById("err");
   const runBtn = document.getElementById("run");
   const clearBtn = document.getElementById("clear");
   const codeEl = document.getElementById("code");
 
-  // ---------- Drawing defaults ----------
   ctx.lineWidth = 2;
 
-  // ---------- Turtle state ----------
-  let x = canvas.width / 2;
-  let y = canvas.height / 2;
-  let angle = 0;          // degrees, 0 = right
-  let penDown = true;
+  // Turtle state
+  let x, y, angle, penDown;
 
   function resetTurtle() {
     x = canvas.width / 2;
@@ -91,11 +85,9 @@ turtle.forward(100)
     resetTurtle();
   }
 
-  // ---------- Option B: Command queue ----------
-  // Python calls turtle.forward/left/etc. -> we QUEUE commands.
-  // After Python finishes, JS plays the queue slowly (animated).
+  // Option B: queue commands so pupil code stays the same (no await)
   let queue = [];
-  let delayMs = 10; // smaller = faster (try 5..20)
+  let delayMs = 10; // smaller = faster
 
   function forward(dist) { queue.push(["forward", Number(dist) || 0]); }
   function left(deg) { queue.push(["left", Number(deg) || 0]); }
@@ -115,7 +107,7 @@ turtle.forward(100)
 
       if (type === "forward") {
         const dist = value;
-        const steps = Math.max(1, Math.min(2000, Math.round(Math.abs(dist)))); // cap steps for safety
+        const steps = Math.max(1, Math.min(2000, Math.round(Math.abs(dist))));
         const stepSize = dist / steps;
 
         for (let i = 0; i < steps; i++) {
@@ -130,66 +122,69 @@ turtle.forward(100)
             ctx.stroke();
           }
 
-          x = nx;
-          y = ny;
-
-          // Small delay so movement is visible
+          x = nx; y = ny;
           await new Promise(r => setTimeout(r, delayMs));
         }
       }
     }
-
-    queue = []; // clear after animation completes
+    queue = [];
   }
 
-  // ---------- Boot Pyodide and register "turtle" module ----------
   let pyodide = null;
 
   async function main() {
     try {
       pyodide = await loadPyodide();
 
-      // Allow pupil Python: import turtle
-      pyodide.registerJsModule("turtle", { forward, left, right, penup, pendown });
+      // Register under a safe name
+      pyodide.registerJsModule("cc_turtle", { forward, left, right, penup, pendown });
 
       runBtn.disabled = false;
       statusEl.textContent = "Ready";
     } catch (err) {
       statusEl.textContent = "Failed to load Python";
+      errEl.textContent = String(err);
       console.error(err);
     }
   }
 
-  // ---------- UI handlers ----------
   clearBtn.onclick = () => {
     clearCanvas();
     queue = [];
+    errEl.textContent = "";
     statusEl.textContent = "Ready";
   };
 
   runBtn.onclick = async () => {
-    // Always update immediately so clicks feel responsive
     statusEl.textContent = "Running…";
+    errEl.textContent = "";
 
     try {
       clearCanvas();
       queue = [];
 
-      // Run Python - this will fill the queue via turtle.forward/left/etc.
+      // Force "import turtle" to use our cc_turtle module
+      pyodide.runPython(`
+import sys, importlib
+sys.modules["turtle"] = importlib.import_module("cc_turtle")
+      `.trim());
+
+      // Run pupil code (fills queue)
       await pyodide.runPythonAsync(codeEl.value);
 
-      // Animate after Python finishes (tutorials unchanged)
+      // Animate after Python finishes
       statusEl.textContent = "Drawing…";
       await runQueue();
 
       statusEl.textContent = "Done";
     } catch (err) {
       statusEl.textContent = "Error";
+      errEl.textContent = String(err);
       console.error(err);
     }
   };
 
-  // Start
+  clearCanvas();
   main();
 </script>
 </body>
