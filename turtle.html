@@ -164,10 +164,21 @@ turtle.forward(100)
       queue = [];
 
       // Force "import turtle" to use our cc_turtle module
-      pyodide.runPython(`
+     pyodide.runPython(`
 import sys, importlib
-sys.modules["turtle"] = importlib.import_module("cc_turtle")
-      `.trim());
+
+_t = importlib.import_module("cc_turtle")
+sys.modules["turtle"] = _t
+
+# Allow tutorials that use forward(100) etc (no turtle.)
+globals().update({
+  "forward": _t.forward,
+  "left": _t.left,
+  "right": _t.right,
+  "penup": _t.penup,
+  "pendown": _t.pendown,
+})
+`.trim());
 
       // Run pupil code (fills queue)
       await pyodide.runPythonAsync(codeEl.value);
