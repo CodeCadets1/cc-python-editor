@@ -43,7 +43,7 @@
       // output wiring
       window._cc_append = (s) => append(String(s));
       pyodide.runPython(`
-import sys, js
+import sys, js, builtins
 
 class _CCWriter:
     def write(self, s): js._cc_append(s)
@@ -52,8 +52,7 @@ class _CCWriter:
 sys.stdout = _CCWriter()
 sys.stderr = _CCWriter()
 
-def input(prompt=""):
-    return js.prompt(prompt) or ""
+builtins.input = lambda prompt="": (js.prompt(prompt) or "")
 `);
 
       runBtn.disabled = false;
