@@ -88,10 +88,14 @@ turtle.forward(100)
     penDown = true;
   }
 
-  function forward(dist) {
-    const rad = angle * Math.PI / 180;
-    const nx = x + Math.cos(rad) * dist;
-    const ny = y - Math.sin(rad) * dist;
+ async function forward(dist) {
+  const steps = Math.abs(dist);
+  const stepSize = dist / steps;
+  const rad = angle * Math.PI / 180;
+
+  for (let i = 0; i < steps; i++) {
+    const nx = x + Math.cos(rad) * stepSize;
+    const ny = y - Math.sin(rad) * stepSize;
 
     if (penDown) {
       ctx.beginPath();
@@ -102,7 +106,11 @@ turtle.forward(100)
 
     x = nx;
     y = ny;
+
+    // pause so we can see movement
+    await new Promise(r => setTimeout(r, 10));
   }
+}
 
   function left(deg) { angle += deg; }
   function right(deg) { angle -= deg; }
