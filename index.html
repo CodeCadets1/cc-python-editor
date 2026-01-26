@@ -44,12 +44,17 @@
       window._cc_append = (s) => append(String(s));
       pyodide.runPython(`
 import sys, js
+
 class _CCWriter:
     def write(self, s): js._cc_append(s)
     def flush(self): pass
+
 sys.stdout = _CCWriter()
 sys.stderr = _CCWriter()
-      `);
+
+def input(prompt=""):
+    return js.prompt(prompt) or ""
+`);
 
       runBtn.disabled = false;
       setStatus("Ready");
