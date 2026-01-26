@@ -115,16 +115,24 @@ function pendown(){ queue.push(["pendown"]); }
       statusEl.textContent = "Ready";
 
       runBtn.onclick = async () => {
-        resetCanvas();
-        statusEl.textContent = "Running…";
-        try {
-          await pyodide.runPythonAsync(codeEl.value);
-          statusEl.textContent = "Done";
-        } catch (err) {
-          statusEl.textContent = "Error";
-          console.error(err);
-        }
-      };
+  resetCanvas();
+  queue = [];               // clear old commands
+  statusEl.textContent = "Running…";
+
+  try {
+    // Run Python (this fills the queue)
+    await pyodide.runPythonAsync(codeEl.value);
+
+    // Now animate the queued turtle commands
+    statusEl.textContent = "Drawing…";
+    await runQueue();
+
+    statusEl.textContent = "Done";
+  } catch (err) {
+    statusEl.textContent = "Error";
+    console.error(err);
+  }
+};
     } catch (err) {
       statusEl.textContent = "Failed to load Python";
       console.error(err);
