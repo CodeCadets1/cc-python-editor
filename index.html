@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Code Cadets Python</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+</head>
+<body style="margin:0; padding:14px; font-family:system-ui;">
+  <div id="cc-python-embed" style="border:1px solid #ddd; padding:12px; border-radius:10px; max-width:900px;">
+    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+      <strong>Code Cadets Python</strong>
+      <span id="cc-status" style="font-size:14px;">Loading Python…</span>
+    </div>
+
+    <textarea id="cc-code" spellcheck="false"
+      style="width:100%; height:220px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:14px; padding:10px; border:1px solid #ccc; border-radius:10px;">print("Hello from Code Cadets!")</textarea>
+
+    <div style="display:flex; gap:10px; margin:10px 0;">
+      <button id="cc-run" disabled style="padding:8px 12px; border-radius:10px; border:1px solid #333; background:#111; color:#fff; cursor:pointer;">Run</button>
+      <button id="cc-clear" style="padding:8px 12px; border-radius:10px; border:1px solid #999; background:#fff; cursor:pointer;">Clear output</button>
+    </div>
+
+    <pre id="cc-out" style="white-space:pre-wrap; background:#0b1020; color:#e8e8e8; padding:10px; border-radius:10px; min-height:90px; margin:0;"></pre>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("cc-status");
+    const runBtn = document.getElementById("cc-run");
+    const clearBtn = document.getElementById("cc-clear");
+    const codeEl = document.getElementById("cc-code");
+    const outEl = document.getElementById("cc-out");
+
+    const append = (t) => { outEl.textContent += t; };
+    const setStatus = (t) => { statusEl.textContent = t; };
+
+    clearBtn.onclick = () => outEl.textContent = "";
+
+    async function main(){
+      setStatus("Loading Python…");
+      const pyodide = await loadPyodide();
+
+      // output wiring
+      window._cc_append = (s) => append(String(s));
+      pyodide.runPython(`
+import sys, js
+class _CCWriter:
+    def write(self, s): js._cc_append(s)
+    def flush(self): pass
+sys.stdout = _CCWriter()
+sys.stderr = _CCWriter()
+      `);
+
+      runBtn.disabled = false;
+      setStatus("Ready");
+
+      runBtn.onclick = async () => {
+        outEl.textContent = "";
+        setStatus("Running…");
+        runBtn.disabled = true;
+        try {
+          await pyodide.runPythonAsync(codeEl.value);
+          setStatus("Done");
+        } catch (e) {
+          append(String(e) + "\\n");
+          setStatus("Error");
+        } finally {
+          runBtn.disabled = false;
+        }
+      };
+    }
+    main();
+  </script>
+</body>
+</html>
