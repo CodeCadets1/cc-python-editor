@@ -356,87 +356,80 @@ print("Done!")</textarea>
   }
 
   // ---------- Run queued commands (after Python completes) ----------
-  async function runQueue(){
-    for (const cmd of queue){
-      const type = cmd[0];
-      const value = cmd[1];
+// ---------- Run queued commands (after Python completes) ----------
+async function runQueue(){
+  for (const cmd of queue){
+    const type = cmd[0];
+    const value = cmd[1];
 
-      if (type === "noop") { continue; }
+    if (type === "noop") {
+      // do nothing
+    }
+    else if (type === "left") { angle += value; }
+    else if (type === "right") { angle -= value; }
+    else if (type === "penup") { penDown = false; }
+    else if (type === "pendown") { penDown = true; }
 
-      if (type === "left") { angle += value; continue; }
-      if (type === "right") { angle -= value; continue; }
-      if (type === "penup") { penDown = false; continue; }
-      if (type === "pendown") { penDown = true; continue; }
+    else if (type === "pencolor") { penColor = String(value ?? penColor); }
+    else if (type === "fillcolor") { fillColor = String(value ?? fillColor); }
+    else if (type === "pensize") { penSize = Math.max(1, Math.min(50, value || 1)); }
 
-      if (type === "pencolor") { penColor = String(value ?? penColor); continue; }
-      if (type === "fillcolor") { fillColor = String(value ?? fillColor); continue; }
-      if (type === "pensize") { penSize = Math.max(1, Math.min(50, value || 1)); continue; }
+    else if (type === "speed") { applySpeed(value); }
 
-      if (type === "speed") { applySpeed(value); continue; }
+    else if (type === "tracer") {
+      const n = value?.n;
+      const d = value?.delay;
 
-      if (type === "tracer") {
-        const n = value?.n;
-        const d = value?.delay;
-
-        tracerN = (Number.isFinite(n) ? n : 1);
-        tracerN = Math.max(0, Math.min(50, Math.round(tracerN)));
-
-        tracerDelayMs = (d === null || d === undefined) ? null : Math.max(0, Math.min(2000, Math.round(d)));
-        continue;
-      }
-
-      if (type === "begin_fill") {
-        isFilling = true;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        continue;
-      }
-
-      if (type === "end_fill") {
-        if (isFilling){
-          ctx.closePath();
-          ctx.fillStyle = fillColor;
-          ctx.fill();
-          if (penDown){
-            ctx.lineWidth = penSize;
-            ctx.strokeStyle = penColor;
-            ctx.stroke();
-          }
-        }
-        isFilling = false;
-        continue;
-      }
-
-      if (type === "home") {
-        await moveGotoAnimated(0, 0);
-        angle = 0;
-        continue;
-      }
-
-      if (type === "clear") {
-        clearCanvas();
-        continue;
-      }
-
-      if (type === "goto") {
-        const tx = value[0], ty = value[1];
-        await moveGotoAnimated(tx, ty);
-        continue;
-      }
-
-      if (type === "circle") {
-        await circleAnimated(value);
-        continue;
-      }
-
-      if (type === "forward") {
-        await moveForwardAnimated(value);
-        continue;
-      }
+      tracerN = (Number.isFinite(n) ? n : 1);
+      tracerN = Math.max(0, Math.min(50, Math.round(tracerN)));
+      tracerDelayMs = (d === null || d === undefined) ? null : Math.max(0, Math.min(2000, Math.round(d)));
     }
 
-    queue = [];
+    else if (type === "begin_fill") {
+      isFilling = true;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
+
+    else if (type === "end_fill") {
+      if (isFilling){
+        ctx.closePath();
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+        if (penDown){
+          ctx.lineWidth = penSize;
+          ctx.strokeStyle = penColor;
+          ctx.stroke();
+        }
+      }
+      isFilling = false;
+    }
+
+    else if (type === "home") {
+      await moveGotoAnimated(0, 0);
+      angle = 0;
+    }
+
+    else if (type === "clear") {
+      clearCanvas();
+    }
+
+    else if (type === "goto") {
+      const tx = value[0], ty = value[1];
+      await moveGotoAnimated(tx, ty);
+    }
+
+    else if (type === "circle") {
+      await circleAnimated(value);
+    }
+
+    else if (type === "forward") {
+      await moveForwardAnimated(value);
+    }
   }
+
+  queue = [];
+}
 
   // ---------- Pyodide boot + Python I/O (like index.html) ----------
   let pyodide = null;
