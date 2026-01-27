@@ -460,6 +460,7 @@ builtins.input = lambda prompt="": js._cc_input(prompt)
       // Register turtle JS module under safe name
       pyodide.registerJsModule("cc_turtle", {
         forward, backward, left, right,
+        pu, pd, fd, bk, rt, lt,
         penup, pendown,
         pencolor, color,
         pensize, width,
