@@ -10,48 +10,37 @@
   <style>
     body { margin:0; padding:14px; font-family:system-ui; }
     h3 { margin:0 0 12px 0; }
-    #layout > div, #layout > canvas { min-width: 0; }
-
-    @media (max-width: 900px) {
-      #layout { grid-template-columns: 1fr; }
-      canvas { width: 100%; height: auto; }
-    }
 
     #layout {
-      display: grid;
-      grid-template-columns: 1.4fr 1fr;
-      gap: 14px;
+      display:grid;
+      grid-template-columns:1.4fr 1fr;
+      gap:14px;
     }
 
-    textarea {
-      width: 100%;
-      height: 280px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 14px;
-      padding: 12px;
-      border-radius: 12px;
-      box-sizing: border-box;
-
-      /* Dark editor look */
-      background: #0f172a;
-      color: #e5e7eb;
-      border: 1px solid #1e293b;
-      caret-color: #38bdf8;
+    @media (max-width:900px){
+      #layout{ grid-template-columns:1fr; }
     }
 
-    textarea::selection {
-      background: #2563eb;
-      color: white;
+    textarea{
+      width:100%;
+      height:300px;
+      font-family:ui-monospace, monospace;
+      background:#0f172a;
+      color:#e5e7eb;
+      padding:12px;
+      border-radius:12px;
+      border:1px solid #1e293b;
+      caret-color:#38bdf8;
+      font-size:14px;
     }
 
-    textarea:focus {
-      outline: none;
-      border-color: #38bdf8;
+    canvas{
+      background:white;
+      border-radius:12px;
+      border:1px solid #ccc;
     }
 
-    canvas { background:#fff; border:1px solid #ccc; border-radius:10px; }
-
-    button {
+    button{
       padding:8px 12px;
       border-radius:10px;
       border:1px solid #333;
@@ -59,524 +48,211 @@
       color:#fff;
       cursor:pointer;
     }
-    button.secondary {
-      border:1px solid #999;
+
+    .secondary{
       background:#fff;
       color:#111;
-    }
-    button:disabled { opacity:0.5; cursor:not-allowed; }
-
-    #toolbar { display:flex; gap:10px; margin:10px 0; flex-wrap:wrap; align-items:center; }
-    #status { font-size:14px; }
-
-    .panelTitle {
-      font-size: 12px;
-      margin: 10px 0 6px 0;
-      color: #374151;
+      border:1px solid #999;
     }
 
-    pre {
-      white-space: pre-wrap;
-      background: #ffffff;
-      color: #111111;
-      padding: 10px;
-      border-radius: 10px;
-      margin: 0;
-      min-height: 90px;
-      border: 1px solid #d1d5db;
+    pre{
+      background:#fff;
+      color:#111;
+      padding:10px;
+      border-radius:10px;
+      min-height:80px;
+      border:1px solid #ddd;
     }
 
-    pre.err {
-      background: #fff6f6;
-      color: #7f1d1d;
-      border: 1px solid #f0c0c0;
+    pre.err{
+      background:#fff6f6;
+      color:#7f1d1d;
+      border-color:#f0c0c0;
     }
   </style>
 </head>
 
 <body>
-  <h3>Code Cadets - Python Turtle</h3>
+<h3>Code Cadets – Python Turtle</h3>
 
-  <div id="layout">
-    <div>
-      <textarea id="code" spellcheck="false">from turtle import *
+<div id="layout">
+  <div>
+<textarea id="code" spellcheck="false">from turtle import *
 
-# Filled square (test)
 pencolor("black")
 fillcolor("deepskyblue")
+
 begin_fill()
-for _ in range(4):
+for i in range(4):
     forward(120)
     left(90)
 end_fill()
 
+dot(50)
+
 print("Done!")</textarea>
 
-      <div id="toolbar">
-        <button id="run" disabled>Run</button>
-        <button id="clearCanvas" class="secondary">Clear canvas</button>
-        <button id="clearOut" class="secondary">Clear output</button>
-        <span id="status">Loading Python…</span>
-      </div>
+<div style="margin:10px 0;">
+  <button id="run" disabled>Run</button>
+  <button id="clearCanvas" class="secondary">Clear canvas</button>
+</div>
 
-      <div class="panelTitle">Output</div>
-      <pre id="out"></pre>
-
-      <div class="panelTitle">Errors</div>
-      <pre id="err" class="err"></pre>
-    </div>
-
-    <canvas id="canvas" width="520" height="520"></canvas>
+<pre id="out"></pre>
+<pre id="err" class="err"></pre>
   </div>
 
+  <canvas id="canvas" width="520" height="520"></canvas>
+</div>
+
 <script>
-  const canvas = document.getElementById("canvas");
-  const ctx = canvas.getContext("2d");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-  const statusEl = document.getElementById("status");
-  const outEl = document.getElementById("out");
-  const errEl = document.getElementById("err");
+const cx = () => canvas.width/2;
+const cy = () => canvas.height/2;
 
-  const runBtn = document.getElementById("run");
-  const clearCanvasBtn = document.getElementById("clearCanvas");
-  const clearOutBtn = document.getElementById("clearOut");
-  const codeEl = document.getElementById("code");
+let x=cx(), y=cy(), angle=0;
+let penDown=true;
+let penColor="#000";
+let fillColor="#000";
+let penSize=2;
 
-  // ---------- Output wiring ----------
-  const appendOut = (t) => { outEl.textContent += String(t); };
-  const setErr = (t) => { errEl.textContent = String(t || ""); };
+let isFilling=false;
+let fillPts=null;
 
-  clearOutBtn.onclick = () => { outEl.textContent = ""; setErr(""); };
+let delayMs=10;
+let tracerN=1;
+let manualUpdate=false;
+let queue=[];
 
-  // ---------- Turtle drawing state ----------
-  const cx = () => canvas.width / 2;
-  const cy = () => canvas.height / 2;
+function q(t,v){ queue.push([t,v]); }
 
-  let x = cx();
-  let y = cy();
-  let angle = 0;
-  let penDown = true;
+function forward(d){ q("forward",d); }
+function backward(d){ q("forward",-d); }
+function left(a){ q("left",a); }
+function right(a){ q("right",a); }
+function goto_(x,y){ q("goto",[x,y]); }
 
-  let penColor = "#000000";
-  let fillColor = "#000000";
-  let penSize = 2;
+function penup(){ penDown=false; }
+function pendown(){ penDown=true; }
+function pu(){ penup(); }
+function pd(){ pendown(); }
 
-  let isFilling = false;
-  let fillPoints = null;
+function pencolor_(c){ penColor=String(c); }
+function pencolor(c){ q("pencolor",c); }
+function fillcolor(c){ q("fillcolor",c); }
 
-  // Animation controls
-  let delayMs = 10;
-  let tracerN = 1;
-  let tracerDelayMs = null;
+function pensize(s){ q("pensize",s); }
 
-  // tracer(0,0) mode like desktop turtle
-  let manualUpdateMode = false;
+function begin_fill(){ q("begin_fill"); }
+function end_fill(){ q("end_fill"); }
 
-  // NEW: only disable per-step animation while we are inside an update() flush
-  let inUpdateFlush = false;
+function dot(size){ q("dot",Number(size)||10); }
 
-  function resetTurtle(){
-    x = cx();
-    y = cy();
-    angle = 0;
-    penDown = true;
+function tracer(n){ tracerN=n; manualUpdate=(n===0); }
+function update(){ q("update"); }
 
-    penColor = "#000000";
-    fillColor = "#000000";
-    penSize = 2;
+function maybeDelay(i){
+  if(manualUpdate) return Promise.resolve();
+  return new Promise(r=>setTimeout(r,delayMs));
+}
 
-    isFilling = false;
-    fillPoints = null;
-
-    delayMs = 10;
-    tracerN = 1;
-    tracerDelayMs = null;
-
-    manualUpdateMode = false;
-    inUpdateFlush = false;
-
-    ctx.lineWidth = penSize;
-    ctx.strokeStyle = penColor;
-    ctx.fillStyle = fillColor;
+async function drawLine(nx,ny,i){
+  ctx.strokeStyle=penColor;
+  ctx.lineWidth=penSize;
+  if(penDown){
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    ctx.lineTo(nx,ny);
+    ctx.stroke();
   }
-
-  function clearCanvas(){
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    resetTurtle();
+  if(isFilling){
+    if(!fillPts) fillPts=[[x,y]];
+    fillPts.push([nx,ny]);
   }
+  x=nx; y=ny;
+  await maybeDelay(i);
+}
 
-  clearCanvasBtn.onclick = () => { clearCanvas(); };
-
-  // ---------- Command queue ----------
-  let queue = [];
-  function q(type, value){ queue.push([type, value]); }
-
-  function update(){ q("update"); }
-  function hideturtle(){ q("noop"); }
-  function showturtle(){ q("noop"); }
-
-  function forward(dist){ q("forward", Number(dist) || 0); }
-  function backward(dist){ q("forward", -(Number(dist) || 0)); }
-  function left(deg){ q("left", Number(deg) || 0); }
-  function right(deg){ q("right", Number(deg) || 0); }
-
-  function penup(){ q("penup"); }
-  function pendown(){ q("pendown"); }
-
-  function pu(){ penup(); }
-  function pd(){ pendown(); }
-  function fd(d){ forward(d); }
-  function bk(d){ backward(d); }
-  function rt(a){ right(a); }
-  function lt(a){ left(a); }
-
-  function pencolor(c){ q("pencolor", c); }
-  function color(c){ q("pencolor", c); }
-
-  function pensize(s){ q("pensize", Number(s) || 1); }
-  function width(s){ q("pensize", Number(s) || 1); }
-
-  function fillcolor(c){ q("fillcolor", c); }
-  function begin_fill(){ q("begin_fill"); }
-  function end_fill(){ q("end_fill"); }
-
-  function goto_(tx, ty){ q("goto", [Number(tx) || 0, Number(ty) || 0]); }
-
-  function circle(radius, extent, steps){
-    q("circle", {
-      radius: Number(radius) || 0,
-      extent: (extent === undefined) ? 360 : Number(extent) || 0,
-      steps: (steps === undefined || steps === null) ? null : (Number(steps) || null),
-    });
-  }
-
-  function speed(s){ q("speed", Number(s)); }
-
-  function tracer(n, d){
-    q("tracer", {
-      n: (n === undefined || n === null) ? 1 : Number(n),
-      delay: (d === undefined || d === null) ? null : Number(d)
-    });
-  }
-
-  function home(){ q("home"); }
-  function clear_(){ q("clear"); }
-
-  // ---------- Helpers ----------
-  function toCanvasX(tx){ return cx() + tx; }
-  function toCanvasY(ty){ return cy() - ty; }
-
-  function maybeDelay(stepIndex){
-    const effectiveTracer = (tracerN === 0 ? 1 : tracerN);
-    const effectiveDelay = (tracerDelayMs !== null) ? tracerDelayMs : delayMs;
-
-    // Key behaviour:
-    // - if tracer(0,0) is active, we disable per-step delay ONLY while flushing update()
-    if (manualUpdateMode && inUpdateFlush) return Promise.resolve();
-
-    if (effectiveTracer > 1 && (stepIndex % effectiveTracer) !== 0) return Promise.resolve();
-    if (!effectiveDelay || effectiveDelay <= 0) return Promise.resolve();
-
-    return new Promise(r => setTimeout(r, effectiveDelay));
-  }
-
-  // Always stroke motion; collect vertices during fill; fill at end_fill
-  async function drawLineTo(nx, ny, stepIndex){
-    ctx.lineWidth = penSize;
-    ctx.strokeStyle = penColor;
-
-    if (isFilling){
-      if (!fillPoints) fillPoints = [[x, y]];
-      fillPoints.push([nx, ny]);
+async function runQueue(){
+  for(const [t,v] of queue){
+    if(t==="left") angle+=v;
+    else if(t==="right") angle-=v;
+    else if(t==="forward"){
+      let steps=Math.abs(v);
+      let step=v/steps;
+      for(let i=0;i<steps;i++){
+        let r=angle*Math.PI/180;
+        await drawLine(x+Math.cos(r)*step,y-Math.sin(r)*step,i);
+      }
     }
-
-    if (penDown){
+    else if(t==="goto"){
+      let [tx,ty]=v;
+      let nx=cx()+tx, ny=cy()-ty;
+      let dx=nx-x, dy=ny-y;
+      let steps=Math.hypot(dx,dy);
+      let sx=dx/steps, sy=dy/steps;
+      for(let i=0;i<steps;i++) await drawLine(x+sx,y+sy,i);
+    }
+    else if(t==="pencolor") penColor=v;
+    else if(t==="fillcolor") fillColor=v;
+    else if(t==="pensize") penSize=Math.max(1,v);
+    else if(t==="begin_fill"){ isFilling=true; fillPts=[[x,y]]; }
+    else if(t==="end_fill"){
+      if(fillPts){
+        ctx.fillStyle=fillColor;
+        ctx.beginPath();
+        ctx.moveTo(fillPts[0][0],fillPts[0][1]);
+        fillPts.forEach(p=>ctx.lineTo(p[0],p[1]));
+        ctx.closePath();
+        ctx.fill();
+      }
+      isFilling=false; fillPts=null;
+    }
+    else if(t==="dot"){
+      ctx.fillStyle=penColor;
       ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(nx, ny);
-      ctx.stroke();
-    }
-
-    x = nx; y = ny;
-    await maybeDelay(stepIndex);
-  }
-
-  async function moveForwardAnimated(dist){
-    const steps = Math.max(1, Math.min(4000, Math.round(Math.abs(dist))));
-    const stepSize = dist / steps;
-
-    for (let i = 1; i <= steps; i++){
-      const rad = angle * Math.PI / 180;
-      const nx = x + Math.cos(rad) * stepSize;
-      const ny = y - Math.sin(rad) * stepSize;
-      await drawLineTo(nx, ny, i);
+      ctx.arc(x,y,v/2,0,Math.PI*2);
+      ctx.fill();
     }
   }
+  queue=[];
+}
 
-  async function moveGotoAnimated(tx, ty){
-    const nx = toCanvasX(tx);
-    const ny = toCanvasY(ty);
+let pyodide=null;
+async function main(){
+  pyodide=await loadPyodide();
 
-    const dx = nx - x;
-    const dy = ny - y;
-    const dist = Math.hypot(dx, dy);
-    const steps = Math.max(1, Math.min(4000, Math.round(dist)));
-    const sx = dx / steps;
-    const sy = dy / steps;
+  pyodide.runPython(`
+import sys, js
+sys.stdout=sys.stderr=type("",(),{"write":lambda self,s:js.out.textContent+=s,"flush":lambda self:None})()
+`);
 
-    for (let i = 1; i <= steps; i++){
-      await drawLineTo(x + sx, y + sy, i);
-    }
-  }
+  pyodide.registerJsModule("cc_turtle",{
+    forward,backward,left,right,
+    goto:goto_,pu,pd,penup,pendown,
+    pencolor:pencolor_,fillcolor,pensize,
+    begin_fill,end_fill,dot,tracer,update
+  });
 
-  async function circleAnimated(spec){
-    const radius = spec.radius || 0;
-    const extent = (spec.extent === undefined) ? 360 : spec.extent;
-    const steps = spec.steps;
+  document.getElementById("run").disabled=false;
+}
 
-    const n = (steps !== null && steps !== undefined)
-      ? Math.max(4, Math.min(720, Math.round(steps)))
-      : Math.max(24, Math.min(240, Math.round(Math.abs(extent) * 0.5)));
+document.getElementById("run").onclick=async()=>{
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  x=cx(); y=cy(); angle=0;
+  queue=[];
+  pyodide.runPython(`
+import importlib,sys
+t=importlib.import_module("cc_turtle")
+sys.modules["turtle"]=t
+globals().update(t.__dict__)
+`);
+  await pyodide.runPythonAsync(code.value);
+  await runQueue();
+};
 
-    const stepAngle = extent / n;
-    const arcLen = (2 * Math.PI * Math.abs(radius)) * (Math.abs(stepAngle) / 360);
-
-    const turnDir = (radius >= 0) ? 1 : -1;
-    const dist = arcLen;
-
-    for (let i = 1; i <= n; i++){
-      await moveForwardAnimated(dist);
-      angle += turnDir * stepAngle;
-    }
-  }
-
-  function applySpeed(s){
-    const n = Number.isFinite(s) ? Math.max(0, Math.min(10, Math.round(s))) : 3;
-    if (n === 0) delayMs = 2;
-    else delayMs = Math.max(1, 32 - (n * 3));
-  }
-
-  // ---------- Queue runner ----------
-  async function runQueueUntilUpdateOrEnd(stopOnUpdate){
-    while (queue.length){
-      const cmd = queue.shift();
-      const type = cmd[0];
-      const value = cmd[1];
-
-      if (type === "noop") { /* nothing */ }
-
-      else if (type === "update") {
-        if (stopOnUpdate) return;
-      }
-
-      else if (type === "left") { angle += value; }
-      else if (type === "right") { angle -= value; }
-      else if (type === "penup") { penDown = false; }
-      else if (type === "pendown") { penDown = true; }
-
-      else if (type === "pencolor") { penColor = String(value ?? penColor); }
-      else if (type === "fillcolor") { fillColor = String(value ?? fillColor); }
-      else if (type === "pensize") { penSize = Math.max(1, Math.min(50, value || 1)); }
-
-      else if (type === "speed") { applySpeed(value); }
-
-      else if (type === "tracer") {
-        const n = value?.n;
-        const d = value?.delay;
-
-        tracerN = (Number.isFinite(n) ? n : 1);
-        tracerN = Math.max(0, Math.min(50, Math.round(tracerN)));
-        tracerDelayMs = (d === null || d === undefined) ? null : Math.max(0, Math.min(2000, Math.round(d)));
-
-        // tracer(0,0) => manual update like desktop turtle
-        manualUpdateMode = (tracerN === 0 && (tracerDelayMs === 0 || tracerDelayMs === null));
-      }
-
-      else if (type === "begin_fill") {
-        isFilling = true;
-        fillPoints = [[x, y]];
-      }
-
-      else if (type === "end_fill") {
-        if (isFilling && fillPoints && fillPoints.length >= 3){
-          ctx.fillStyle = fillColor;
-
-          ctx.beginPath();
-          ctx.moveTo(fillPoints[0][0], fillPoints[0][1]);
-          for (let i = 1; i < fillPoints.length; i++){
-            ctx.lineTo(fillPoints[i][0], fillPoints[i][1]);
-          }
-          ctx.closePath();
-          ctx.fill();
-        }
-        isFilling = false;
-        fillPoints = null;
-      }
-
-      else if (type === "home") {
-        await moveGotoAnimated(0, 0);
-        angle = 0;
-      }
-
-      else if (type === "clear") {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        x = cx(); y = cy(); angle = 0;
-        isFilling = false;
-        fillPoints = null;
-      }
-
-      else if (type === "goto") {
-        const tx = value[0], ty = value[1];
-        await moveGotoAnimated(tx, ty);
-      }
-
-      else if (type === "circle") {
-        await circleAnimated(value);
-      }
-
-      else if (type === "forward") {
-        await moveForwardAnimated(value);
-      }
-    }
-  }
-
-  // Flush helper used by Python-side update()/clear()
-  window._cc_flush = async () => {
-    inUpdateFlush = true;
-    await runQueueUntilUpdateOrEnd(true);
-    inUpdateFlush = false;
-  };
-
-  // ---------- Pyodide boot + Python I/O ----------
-  let pyodide = null;
-
-  async function main(){
-    try{
-      statusEl.textContent = "Loading Python…";
-      pyodide = await loadPyodide();
-
-      window._cc_append = (s) => appendOut(String(s));
-      window._cc_input = (promptText) => (window.prompt(String(promptText ?? "")) || "");
-
-      pyodide.runPython(`
-import sys, js, builtins
-
-class _CCWriter:
-    def write(self, s): js._cc_append(s)
-    def flush(self): pass
-
-sys.stdout = _CCWriter()
-sys.stderr = _CCWriter()
-
-builtins.input = lambda prompt="": js._cc_input(prompt)
-      `.trim());
-
-      pyodide.registerJsModule("cc_turtle", {
-        update,
-        hideturtle,
-        showturtle,
-
-        forward, backward, left, right,
-        pu, pd, fd, bk, rt, lt,
-        penup, pendown,
-        pencolor, color,
-        pensize, width,
-        fillcolor, begin_fill, end_fill,
-        goto: goto_,
-        circle,
-        speed,
-        tracer,
-        home,
-        clear: clear_
-      });
-
-      runBtn.disabled = false;
-      statusEl.textContent = "Ready";
-    } catch (e){
-      statusEl.textContent = "Failed to load Python";
-      setErr(String(e));
-      console.error(e);
-    }
-  }
-
-  // ---------- Run handler ----------
-  runBtn.onclick = async () => {
-    statusEl.textContent = "Running…";
-    setErr("");
-    outEl.textContent = "";
-
-    try{
-      clearCanvas();
-      queue = [];
-
-      pyodide.runPython(`
-import sys, importlib, js
-_t = importlib.import_module("cc_turtle")
-sys.modules["turtle"] = _t
-
-def update():
-    js._cc_flush()
-
-def clear():
-    _t.clear()
-    js._cc_flush()
-
-_t.update = update
-_t.clear = clear
-
-globals().update({
-  "update": update,
-  "clear": clear,
-
-  "hideturtle": _t.hideturtle,
-  "showturtle": _t.showturtle,
-
-  "pu": _t.pu,
-  "pd": _t.pd,
-  "fd": _t.fd,
-  "bk": _t.bk,
-  "rt": _t.rt,
-  "lt": _t.lt,
-
-  "forward": _t.forward,
-  "backward": _t.backward,
-  "left": _t.left,
-  "right": _t.right,
-
-  "penup": _t.penup,
-  "pendown": _t.pendown,
-  "pencolor": _t.pencolor,
-  "color": _t.color,
-  "pensize": _t.pensize,
-  "width": _t.width,
-
-  "fillcolor": _t.fillcolor,
-  "begin_fill": _t.begin_fill,
-  "end_fill": _t.end_fill,
-
-  "goto": _t.goto,
-  "circle": _t.circle,
-  "speed": _t.speed,
-  "tracer": _t.tracer,
-  "home": _t.home,
-})
-      `.trim());
-
-      await pyodide.runPythonAsync(codeEl.value);
-
-      statusEl.textContent = "Drawing…";
-      await runQueueUntilUpdateOrEnd(false);
-
-      statusEl.textContent = "Done";
-    } catch (e){
-      statusEl.textContent = "Error";
-      setErr(String(e));
-      console.error(e);
-    }
-  };
-
-  clearCanvas();
-  main();
+main();
 </script>
 </body>
 </html>
