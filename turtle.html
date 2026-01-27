@@ -201,6 +201,12 @@ print("Done!")</textarea>
   // Pen control
   function penup(){ q("penup"); }
   function pendown(){ q("pendown"); }
+  function pu(){ penup(); }
+  function pd(){ pendown(); }
+  function fd(d){ forward(d); }
+  function bk(d){ backward(d); }
+  function rt(a){ right(a); }
+  function lt(a){ left(a); }
 
   // Styling
   function pencolor(c){ q("pencolor", c); }
