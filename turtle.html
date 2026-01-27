@@ -500,6 +500,12 @@ sys.modules["turtle"] = _t
 
 # Support tutorials that call forward(100) without turtle.
 globals().update({
+  "pu": _t.pu,
+  "pd": _t.pd,
+  "fd": _t.fd,
+  "bk": _t.bk,
+  "rt": _t.rt,
+  "lt": _t.lt,
   "forward": _t.forward,
   "backward": _t.backward,
   "left": _t.left,
