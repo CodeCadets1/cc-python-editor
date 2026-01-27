@@ -191,6 +191,7 @@ print("Done!")</textarea>
   let queue = [];
 
   function q(type, value){ queue.push([type, value]); }
+  function update(){ q("noop"); }
 
   // Minimal movement/turning
   function forward(dist){ q("forward", Number(dist) || 0); }
@@ -351,6 +352,7 @@ print("Done!")</textarea>
 
   // ---------- Run queued commands (after Python completes) ----------
   async function runQueue(){
+    if (type === "noop") { continue; }
     for (const cmd of queue){
       const type = cmd[0];
       const value = cmd[1];
@@ -459,6 +461,7 @@ builtins.input = lambda prompt="": js._cc_input(prompt)
 
       // Register turtle JS module under safe name
       pyodide.registerJsModule("cc_turtle", {
+        update,
         forward, backward, left, right,
         pu, pd, fd, bk, rt, lt,
         penup, pendown,
@@ -500,6 +503,7 @@ sys.modules["turtle"] = _t
 
 # Support tutorials that call forward(100) without turtle.
 globals().update({
+  "update": _t.update,
   "pu": _t.pu,
   "pd": _t.pd,
   "fd": _t.fd,
