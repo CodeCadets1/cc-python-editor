@@ -12,41 +12,42 @@
     h3 { margin:0 0 12px 0; }
     #layout > div, #layout > canvas { min-width: 0; }
 
-@media (max-width: 900px) {
-  #layout { grid-template-columns: 1fr; }
-  canvas { width: 100%; height: auto; }
-}
+    @media (max-width: 900px) {
+      #layout { grid-template-columns: 1fr; }
+      canvas { width: 100%; height: auto; }
+    }
 
     #layout {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 14px;
-}
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 14px;
+    }
 
-  textarea {
-  width: 100%;
-  height: 280px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 14px;
-  padding: 12px;
-  border-radius: 12px;
-  box-sizing: border-box;
+    textarea {
+      width: 100%;
+      height: 280px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+      padding: 12px;
+      border-radius: 12px;
+      box-sizing: border-box;
 
-  /* Dark editor look */
-  background: #0f172a;        /* deep navy */
-  color: #e5e7eb;             /* soft white text */
-  border: 1px solid #1e293b;  /* subtle border */
-  caret-color: #38bdf8;       /* bright cursor */
-}
+      /* Dark editor look */
+      background: #0f172a;
+      color: #e5e7eb;
+      border: 1px solid #1e293b;
+      caret-color: #38bdf8;
+    }
+
     textarea::selection {
-  background: #2563eb;
-  color: white;
-}
+      background: #2563eb;
+      color: white;
+    }
 
-textarea:focus {
-  outline: none;
-  border-color: #38bdf8;
-}
+    textarea:focus {
+      outline: none;
+      border-color: #38bdf8;
+    }
 
     canvas { background:#fff; border:1px solid #ccc; border-radius:10px; }
 
@@ -69,25 +70,27 @@ textarea:focus {
     #status { font-size:14px; }
 
     .panelTitle {
-  font-size: 12px;
-  margin: 10px 0 6px 0;
-  color: #374151; /* darker label text */
-}
+      font-size: 12px;
+      margin: 10px 0 6px 0;
+      color: #374151;
+    }
+
     pre {
-  white-space: pre-wrap;
-  background: #ffffff;      /* white output */
-  color: #111111;           /* dark text */
-  padding: 10px;
-  border-radius: 10px;
-  margin: 0;
-  min-height: 90px;
-  border: 1px solid #d1d5db; /* light grey border */
-}
+      white-space: pre-wrap;
+      background: #ffffff;
+      color: #111111;
+      padding: 10px;
+      border-radius: 10px;
+      margin: 0;
+      min-height: 90px;
+      border: 1px solid #d1d5db;
+    }
+
     pre.err {
-  background: #fff6f6;
-  color: #7f1d1d;
-  border: 1px solid #f0c0c0;
-}
+      background: #fff6f6;
+      color: #7f1d1d;
+      border: 1px solid #f0c0c0;
+    }
   </style>
 </head>
 
@@ -161,9 +164,9 @@ print("Done!")</textarea>
   let isFilling = false;
 
   // Animation controls
-  let delayMs = 10;        // base delay (used when tracer enabled)
-  let tracerN = 1;         // 0 = no animation (instant), 1 = normal
-  let tracerDelayMs = null;// optional extra delay override (if set via tracer)
+  let delayMs = 10;         // base delay
+  let tracerN = 1;          // 0 = no animation (desktop turtle), but we’ll keep minimal animation
+  let tracerDelayMs = null; // optional delay override via tracer()
 
   function resetTurtle(){
     x = cx();
@@ -191,7 +194,11 @@ print("Done!")</textarea>
   let queue = [];
 
   function q(type, value){ queue.push([type, value]); }
+
+  // Turtle compatibility no-ops / helpers
   function update(){ q("noop"); }
+  function hideturtle(){ q("noop"); }
+  function showturtle(){ q("noop"); }
 
   // Minimal movement/turning
   function forward(dist){ q("forward", Number(dist) || 0); }
@@ -202,6 +209,8 @@ print("Done!")</textarea>
   // Pen control
   function penup(){ q("penup"); }
   function pendown(){ q("pendown"); }
+
+  // Common aliases used in worksheets
   function pu(){ penup(); }
   function pd(){ pendown(); }
   function fd(d){ forward(d); }
@@ -255,13 +264,12 @@ print("Done!")</textarea>
   function toCanvasY(ty){ return cy() - ty; } // y up in turtle -> y down in canvas
 
   function maybeDelay(stepIndex){
-    // tracerN == 0 means draw instantly
-    if (tracerN === 0) return Promise.resolve();
+    // Keep at least minimal animation even if tracer(0,0) is used
+    const effectiveTracer = (tracerN === 0 ? 1 : tracerN);
 
     const effectiveDelay = (tracerDelayMs !== null) ? tracerDelayMs : delayMs;
 
-    // If tracerN > 1, only pause every N steps
-    if (tracerN > 1 && (stepIndex % tracerN) !== 0) return Promise.resolve();
+    if (effectiveTracer > 1 && (stepIndex % effectiveTracer) !== 0) return Promise.resolve();
     if (!effectiveDelay || effectiveDelay <= 0) return Promise.resolve();
 
     return new Promise(r => setTimeout(r, effectiveDelay));
@@ -329,10 +337,8 @@ print("Done!")</textarea>
       : Math.max(24, Math.min(240, Math.round(Math.abs(extent) * 0.5)));
 
     const stepAngle = extent / n;
-    // approximate arc length per segment
     const arcLen = (2 * Math.PI * Math.abs(radius)) * (Math.abs(stepAngle) / 360);
 
-    // For negative radius, turtle direction is reversed; we mimic by turning opposite
     const turnDir = (radius >= 0) ? 1 : -1;
     const dist = arcLen;
 
@@ -343,19 +349,19 @@ print("Done!")</textarea>
   }
 
   function applySpeed(s){
-    // Rough mapping to "visible" speeds
-    // 0 = fastest (no delay), 10 = fast, 1 = slow
+    // 0 = fastest, but keep minimal visible animation
     const n = Number.isFinite(s) ? Math.max(0, Math.min(10, Math.round(s))) : 3;
-    if (n === 0) delayMs = 0;
-    else delayMs = Math.max(1, 32 - (n * 3)); // e.g. 1->29ms, 10->2ms
+    if (n === 0) delayMs = 2;            // keep visible (was 0)
+    else delayMs = Math.max(1, 32 - (n * 3));
   }
 
   // ---------- Run queued commands (after Python completes) ----------
   async function runQueue(){
-    if (type === "noop") { continue; }
     for (const cmd of queue){
       const type = cmd[0];
       const value = cmd[1];
+
+      if (type === "noop") { continue; }
 
       if (type === "left") { angle += value; continue; }
       if (type === "right") { angle -= value; continue; }
@@ -388,7 +394,6 @@ print("Done!")</textarea>
 
       if (type === "end_fill") {
         if (isFilling){
-          // Close, fill, and stroke outline (if pen down)
           ctx.closePath();
           ctx.fillStyle = fillColor;
           ctx.fill();
@@ -462,6 +467,9 @@ builtins.input = lambda prompt="": js._cc_input(prompt)
       // Register turtle JS module under safe name
       pyodide.registerJsModule("cc_turtle", {
         update,
+        hideturtle,
+        showturtle,
+
         forward, backward, left, right,
         pu, pd, fd, bk, rt, lt,
         penup, pendown,
@@ -504,25 +512,32 @@ sys.modules["turtle"] = _t
 # Support tutorials that call forward(100) without turtle.
 globals().update({
   "update": _t.update,
+  "hideturtle": _t.hideturtle,
+  "showturtle": _t.showturtle,
+
   "pu": _t.pu,
   "pd": _t.pd,
   "fd": _t.fd,
   "bk": _t.bk,
   "rt": _t.rt,
   "lt": _t.lt,
+
   "forward": _t.forward,
   "backward": _t.backward,
   "left": _t.left,
   "right": _t.right,
+
   "penup": _t.penup,
   "pendown": _t.pendown,
   "pencolor": _t.pencolor,
   "color": _t.color,
   "pensize": _t.pensize,
   "width": _t.width,
+
   "fillcolor": _t.fillcolor,
   "begin_fill": _t.begin_fill,
   "end_fill": _t.end_fill,
+
   "goto": _t.goto,
   "circle": _t.circle,
   "speed": _t.speed,
