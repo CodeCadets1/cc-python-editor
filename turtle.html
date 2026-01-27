@@ -10,6 +10,12 @@
   <style>
     body { margin:0; padding:14px; font-family:system-ui; }
     h3 { margin:0 0 12px 0; }
+    #layout > div, #layout > canvas { min-width: 0; }
+
+@media (max-width: 900px) {
+  #layout { grid-template-columns: 1fr; }
+  canvas { width: 100%; height: auto; }
+}
 
     #layout {
       display:grid;
