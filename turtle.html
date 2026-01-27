@@ -99,12 +99,41 @@
 
   <div id="layout">
     <div>
-      <textarea id="code" spellcheck="false">import turtle
+      <textarea id="code" spellcheck="false">from turtle import *
+import time
 
-# Square
-for _ in range(4):
-    forward(100)
-    left(90)
+def drawLowArms():
+  tracer(0,0)
+  pu(); goto(0,0); pd()
+  circle(50)
+  goto(0,-25)
+  goto(-10,-100); goto(0,-25); goto(10,-100); goto(0,-25)
+  goto(0,-100)
+  goto(-15,-200); goto(0,-100); goto(15,-200); goto(15,-200)
+  update()
+
+def drawHighArms():
+  tracer(0,0)
+  pu(); goto(0,0); pd()
+  circle(50)
+  goto(0,-25)
+  goto(-75,0); goto(0,-25); goto(75,0); goto(0,-25)
+  goto(0,-100)
+  goto(-60,-200); goto(0,-100); goto(60,-200)
+  update()
+
+pensize(10)
+pencolor("red")
+hideturtle()
+
+for i in range(10):
+  clear()
+  drawLowArms()
+  time.sleep(0.5)
+
+  clear()
+  drawHighArms()
+  time.sleep(0.5)
 
 print("Done!")</textarea>
 
@@ -148,25 +177,25 @@ print("Done!")</textarea>
   const cx = () => canvas.width / 2;
   const cy = () => canvas.height / 2;
 
-  // Turtle uses a centered coordinate system:
-  // turtle.goto(0,0) => center of canvas
-  // positive y is up (we convert to canvas coords)
-  let x = cx();      // canvas coords
-  let y = cy();      // canvas coords
-  let angle = 0;     // degrees, 0 = right, 90 = up
+  let x = cx();
+  let y = cy();
+  let angle = 0;
   let penDown = true;
 
   let penColor = "#000000";
   let fillColor = "#000000";
   let penSize = 2;
 
-  // Fill handling
   let isFilling = false;
 
   // Animation controls
-  let delayMs = 10;         // base delay
-  let tracerN = 1;          // 0 = no animation (desktop turtle), but we’ll keep minimal animation
-  let tracerDelayMs = null; // optional delay override via tracer()
+  let delayMs = 10;
+  let tracerN = 1;
+  let tracerDelayMs = null;
+
+  // IMPORTANT: when tracer(0,0) is set, turtle should not auto-draw
+  // until update() is called.
+  let manualUpdateMode = false;
 
   function resetTurtle(){
     x = cx();
@@ -177,6 +206,11 @@ print("Done!")</textarea>
     fillColor = "#000000";
     penSize = 2;
     isFilling = false;
+
+    delayMs = 10;
+    tracerN = 1;
+    tracerDelayMs = null;
+    manualUpdateMode = false;
 
     ctx.lineWidth = penSize;
     ctx.strokeStyle = penColor;
@@ -190,27 +224,24 @@ print("Done!")</textarea>
 
   clearCanvasBtn.onclick = () => { clearCanvas(); };
 
-  // ---------- Option B: command queue (keep pupil code synchronous) ----------
+  // ---------- Command queue ----------
   let queue = [];
 
   function q(type, value){ queue.push([type, value]); }
 
   // Turtle compatibility no-ops / helpers
-  function update(){ q("noop"); }
+  function update(){ q("update"); }         // <-- special (flush)
   function hideturtle(){ q("noop"); }
   function showturtle(){ q("noop"); }
 
-  // Minimal movement/turning
   function forward(dist){ q("forward", Number(dist) || 0); }
   function backward(dist){ q("forward", -(Number(dist) || 0)); }
   function left(deg){ q("left", Number(deg) || 0); }
   function right(deg){ q("right", Number(deg) || 0); }
 
-  // Pen control
   function penup(){ q("penup"); }
   function pendown(){ q("pendown"); }
 
-  // Common aliases used in worksheets
   function pu(){ penup(); }
   function pd(){ pendown(); }
   function fd(d){ forward(d); }
@@ -218,22 +249,17 @@ print("Done!")</textarea>
   function rt(a){ right(a); }
   function lt(a){ left(a); }
 
-  // Styling
   function pencolor(c){ q("pencolor", c); }
-  function color(c){ q("pencolor", c); }      // alias
+  function color(c){ q("pencolor", c); }
   function pensize(s){ q("pensize", Number(s) || 1); }
-  function width(s){ q("pensize", Number(s) || 1); }  // alias
+  function width(s){ q("pensize", Number(s) || 1); }
 
-  // Fill
   function fillcolor(c){ q("fillcolor", c); }
   function begin_fill(){ q("begin_fill"); }
   function end_fill(){ q("end_fill"); }
 
-  // Positioning
   function goto_(tx, ty){ q("goto", [Number(tx) || 0, Number(ty) || 0]); }
 
-  // Circle
-  // Support circle(radius, extent=360, steps=None)
   function circle(radius, extent, steps){
     q("circle", {
       radius: Number(radius) || 0,
@@ -242,12 +268,8 @@ print("Done!")</textarea>
     });
   }
 
-  // Speed: turtle.speed(0..10) (rough mapping)
-  function speed(s){
-    q("speed", Number(s));
-  }
+  function speed(s){ q("speed", Number(s)); }
 
-  // Tracer: turtle.tracer(n=None, delay=None)
   function tracer(n, d){
     q("tracer", {
       n: (n === undefined || n === null) ? 1 : Number(n),
@@ -255,19 +277,22 @@ print("Done!")</textarea>
     });
   }
 
-  // (Optional but helpful) clear/home (many tutorials use these)
   function home(){ q("home"); }
+
+  // IMPORTANT: clear() should behave like turtle.clear()
+  // but in manualUpdateMode we want it to clear immediately on update().
   function clear_(){ q("clear"); }
 
   // ---------- Helpers ----------
   function toCanvasX(tx){ return cx() + tx; }
-  function toCanvasY(ty){ return cy() - ty; } // y up in turtle -> y down in canvas
+  function toCanvasY(ty){ return cy() - ty; }
 
   function maybeDelay(stepIndex){
-    // Keep at least minimal animation even if tracer(0,0) is used
     const effectiveTracer = (tracerN === 0 ? 1 : tracerN);
-
     const effectiveDelay = (tracerDelayMs !== null) ? tracerDelayMs : delayMs;
+
+    // If in manual update mode, we do NOT animate per-step.
+    if (manualUpdateMode) return Promise.resolve();
 
     if (effectiveTracer > 1 && (stepIndex % effectiveTracer) !== 0) return Promise.resolve();
     if (!effectiveDelay || effectiveDelay <= 0) return Promise.resolve();
@@ -282,10 +307,8 @@ print("Done!")</textarea>
 
     if (penDown){
       if (isFilling){
-        // While filling, add to current path only
         ctx.lineTo(nx, ny);
       } else {
-        // Normal stroke segment
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.lineTo(nx, ny);
@@ -313,7 +336,6 @@ print("Done!")</textarea>
     const nx = toCanvasX(tx);
     const ny = toCanvasY(ty);
 
-    // animate as a straight line in steps so we can see motion
     const dx = nx - x;
     const dy = ny - y;
     const dist = Math.hypot(dx, dy);
@@ -331,7 +353,6 @@ print("Done!")</textarea>
     const extent = (spec.extent === undefined) ? 360 : spec.extent;
     const steps = spec.steps;
 
-    // Choose a reasonable default if steps not provided
     const n = (steps !== null && steps !== undefined)
       ? Math.max(4, Math.min(720, Math.round(steps)))
       : Math.max(24, Math.min(240, Math.round(Math.abs(extent) * 0.5)));
@@ -349,89 +370,102 @@ print("Done!")</textarea>
   }
 
   function applySpeed(s){
-    // 0 = fastest, but keep minimal visible animation
     const n = Number.isFinite(s) ? Math.max(0, Math.min(10, Math.round(s))) : 3;
-    if (n === 0) delayMs = 2;            // keep visible (was 0)
+    if (n === 0) delayMs = 2;
     else delayMs = Math.max(1, 32 - (n * 3));
   }
 
-  // ---------- Run queued commands (after Python completes) ----------
-// ---------- Run queued commands (after Python completes) ----------
-async function runQueue(){
-  for (const cmd of queue){
-    const type = cmd[0];
-    const value = cmd[1];
+  // ---------- Queue runner ----------
+  async function runQueueUntilUpdateOrEnd(stopOnUpdate){
+    while (queue.length){
+      const cmd = queue.shift();
+      const type = cmd[0];
+      const value = cmd[1];
 
-    if (type === "noop") {
-      // do nothing
-    }
-    else if (type === "left") { angle += value; }
-    else if (type === "right") { angle -= value; }
-    else if (type === "penup") { penDown = false; }
-    else if (type === "pendown") { penDown = true; }
+      if (type === "noop") { /* nothing */ }
 
-    else if (type === "pencolor") { penColor = String(value ?? penColor); }
-    else if (type === "fillcolor") { fillColor = String(value ?? fillColor); }
-    else if (type === "pensize") { penSize = Math.max(1, Math.min(50, value || 1)); }
-
-    else if (type === "speed") { applySpeed(value); }
-
-    else if (type === "tracer") {
-      const n = value?.n;
-      const d = value?.delay;
-
-      tracerN = (Number.isFinite(n) ? n : 1);
-      tracerN = Math.max(0, Math.min(50, Math.round(tracerN)));
-      tracerDelayMs = (d === null || d === undefined) ? null : Math.max(0, Math.min(2000, Math.round(d)));
-    }
-
-    else if (type === "begin_fill") {
-      isFilling = true;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-    }
-
-    else if (type === "end_fill") {
-      if (isFilling){
-        ctx.closePath();
-        ctx.fillStyle = fillColor;
-        ctx.fill();
-        if (penDown){
-          ctx.lineWidth = penSize;
-          ctx.strokeStyle = penColor;
-          ctx.stroke();
-        }
+      else if (type === "update") {
+        // flush point
+        if (stopOnUpdate) return;
       }
-      isFilling = false;
-    }
 
-    else if (type === "home") {
-      await moveGotoAnimated(0, 0);
-      angle = 0;
-    }
+      else if (type === "left") { angle += value; }
+      else if (type === "right") { angle -= value; }
+      else if (type === "penup") { penDown = false; }
+      else if (type === "pendown") { penDown = true; }
 
-    else if (type === "clear") {
-      clearCanvas();
-    }
+      else if (type === "pencolor") { penColor = String(value ?? penColor); }
+      else if (type === "fillcolor") { fillColor = String(value ?? fillColor); }
+      else if (type === "pensize") { penSize = Math.max(1, Math.min(50, value || 1)); }
 
-    else if (type === "goto") {
-      const tx = value[0], ty = value[1];
-      await moveGotoAnimated(tx, ty);
-    }
+      else if (type === "speed") { applySpeed(value); }
 
-    else if (type === "circle") {
-      await circleAnimated(value);
-    }
+      else if (type === "tracer") {
+        const n = value?.n;
+        const d = value?.delay;
 
-    else if (type === "forward") {
-      await moveForwardAnimated(value);
+        tracerN = (Number.isFinite(n) ? n : 1);
+        tracerN = Math.max(0, Math.min(50, Math.round(tracerN)));
+        tracerDelayMs = (d === null || d === undefined) ? null : Math.max(0, Math.min(2000, Math.round(d)));
+
+        // If tracer(0,0): manual update mode like desktop turtle
+        manualUpdateMode = (tracerN === 0 && (tracerDelayMs === 0 || tracerDelayMs === null));
+      }
+
+      else if (type === "begin_fill") {
+        isFilling = true;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      }
+
+      else if (type === "end_fill") {
+        if (isFilling){
+          ctx.closePath();
+          ctx.fillStyle = fillColor;
+          ctx.fill();
+          if (penDown){
+            ctx.lineWidth = penSize;
+            ctx.strokeStyle = penColor;
+            ctx.stroke();
+          }
+        }
+        isFilling = false;
+      }
+
+      else if (type === "home") {
+        await moveGotoAnimated(0, 0);
+        angle = 0;
+      }
+
+      else if (type === "clear") {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // don't reset styles; turtle.clear() keeps pen settings
+        x = cx(); y = cy(); angle = 0;
+        isFilling = false;
+      }
+
+      else if (type === "goto") {
+        const tx = value[0], ty = value[1];
+        await moveGotoAnimated(tx, ty);
+      }
+
+      else if (type === "circle") {
+        await circleAnimated(value);
+      }
+
+      else if (type === "forward") {
+        await moveForwardAnimated(value);
+      }
     }
   }
 
-  queue = [];
-}
+  // Expose a flush function that Python can call (for update/clear animation)
+  window._cc_flush = async () => {
+    // run until first update marker, then stop (so update() controls frames)
+    await runQueueUntilUpdateOrEnd(true);
+  };
 
-  // ---------- Pyodide boot + Python I/O (like index.html) ----------
+  // ---------- Pyodide boot + Python I/O ----------
   let pyodide = null;
 
   async function main(){
@@ -457,7 +491,7 @@ sys.stderr = _CCWriter()
 builtins.input = lambda prompt="": js._cc_input(prompt)
       `.trim());
 
-      // Register turtle JS module under safe name
+      // Register turtle JS module
       pyodide.registerJsModule("cc_turtle", {
         update,
         hideturtle,
@@ -496,15 +530,27 @@ builtins.input = lambda prompt="": js._cc_input(prompt)
       clearCanvas();
       queue = [];
 
-      // Force import turtle to use our module, and also support forward(100) style
       pyodide.runPython(`
-import sys, importlib
+import sys, importlib, js
 _t = importlib.import_module("cc_turtle")
 sys.modules["turtle"] = _t
 
-# Support tutorials that call forward(100) without turtle.
+# Make update() flush immediately (so time.sleep animations work)
+def update():
+    js._cc_flush()
+
+# Make clear() also flush (so frames swap cleanly)
+def clear():
+    _t.clear()
+    js._cc_flush()
+
+_t.update = update
+_t.clear = clear
+
 globals().update({
-  "update": _t.update,
+  "update": update,
+  "clear": clear,
+
   "hideturtle": _t.hideturtle,
   "showturtle": _t.showturtle,
 
@@ -536,16 +582,15 @@ globals().update({
   "speed": _t.speed,
   "tracer": _t.tracer,
   "home": _t.home,
-  "clear": _t.clear,
 })
       `.trim());
 
-      // Run pupil code (fills queue and prints to Output)
+      // Run pupil code (it will call update()/clear() which flushes frames)
       await pyodide.runPythonAsync(codeEl.value);
 
-      // Animate turtle commands
+      // After Python finishes, flush any remaining queued commands to the end
       statusEl.textContent = "Drawing…";
-      await runQueue();
+      await runQueueUntilUpdateOrEnd(false);
 
       statusEl.textContent = "Done";
     } catch (e){
