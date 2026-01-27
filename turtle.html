@@ -100,40 +100,15 @@
   <div id="layout">
     <div>
       <textarea id="code" spellcheck="false">from turtle import *
-import time
 
-def drawLowArms():
-  tracer(0,0)
-  pu(); goto(0,0); pd()
-  circle(50)
-  goto(0,-25)
-  goto(-10,-100); goto(0,-25); goto(10,-100); goto(0,-25)
-  goto(0,-100)
-  goto(-15,-200); goto(0,-100); goto(15,-200); goto(15,-200)
-  update()
-
-def drawHighArms():
-  tracer(0,0)
-  pu(); goto(0,0); pd()
-  circle(50)
-  goto(0,-25)
-  goto(-75,0); goto(0,-25); goto(75,0); goto(0,-25)
-  goto(0,-100)
-  goto(-60,-200); goto(0,-100); goto(60,-200)
-  update()
-
-pensize(10)
-pencolor("red")
-hideturtle()
-
-for i in range(10):
-  clear()
-  drawLowArms()
-  time.sleep(0.5)
-
-  clear()
-  drawHighArms()
-  time.sleep(0.5)
+# Filled square (test)
+pencolor("black")
+fillcolor("deepskyblue")
+begin_fill()
+for _ in range(4):
+    forward(120)
+    left(90)
+end_fill()
 
 print("Done!")</textarea>
 
@@ -187,14 +162,14 @@ print("Done!")</textarea>
   let penSize = 2;
 
   let isFilling = false;
+  let fillPoints = null; // <-- NEW (stores vertices during fill)
 
   // Animation controls
   let delayMs = 10;
   let tracerN = 1;
   let tracerDelayMs = null;
 
-  // IMPORTANT: when tracer(0,0) is set, turtle should not auto-draw
-  // until update() is called.
+  // Manual update mode (tracer(0,0) + update())
   let manualUpdateMode = false;
 
   function resetTurtle(){
@@ -205,7 +180,9 @@ print("Done!")</textarea>
     penColor = "#000000";
     fillColor = "#000000";
     penSize = 2;
+
     isFilling = false;
+    fillPoints = null;
 
     delayMs = 10;
     tracerN = 1;
@@ -230,7 +207,7 @@ print("Done!")</textarea>
   function q(type, value){ queue.push([type, value]); }
 
   // Turtle compatibility no-ops / helpers
-  function update(){ q("update"); }         // <-- special (flush)
+  function update(){ q("update"); }         // flush marker
   function hideturtle(){ q("noop"); }
   function showturtle(){ q("noop"); }
 
@@ -278,9 +255,6 @@ print("Done!")</textarea>
   }
 
   function home(){ q("home"); }
-
-  // IMPORTANT: clear() should behave like turtle.clear()
-  // but in manualUpdateMode we want it to clear immediately on update().
   function clear_(){ q("clear"); }
 
   // ---------- Helpers ----------
@@ -291,7 +265,6 @@ print("Done!")</textarea>
     const effectiveTracer = (tracerN === 0 ? 1 : tracerN);
     const effectiveDelay = (tracerDelayMs !== null) ? tracerDelayMs : delayMs;
 
-    // If in manual update mode, we do NOT animate per-step.
     if (manualUpdateMode) return Promise.resolve();
 
     if (effectiveTracer > 1 && (stepIndex % effectiveTracer) !== 0) return Promise.resolve();
@@ -300,20 +273,23 @@ print("Done!")</textarea>
     return new Promise(r => setTimeout(r, effectiveDelay));
   }
 
+  // ---------- KEY CHANGE: always stroke segments, and record fill vertices ----------
   async function drawLineTo(nx, ny, stepIndex){
     ctx.lineWidth = penSize;
     ctx.strokeStyle = penColor;
-    ctx.fillStyle = fillColor;
 
+    // If filling, record the vertex so we can fill later
+    if (isFilling){
+      if (!fillPoints) fillPoints = [[x, y]];
+      fillPoints.push([nx, ny]);
+    }
+
+    // Always show motion by stroking the segment
     if (penDown){
-      if (isFilling){
-        ctx.lineTo(nx, ny);
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(nx, ny);
-        ctx.stroke();
-      }
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(nx, ny);
+      ctx.stroke();
     }
 
     x = nx; y = ny;
@@ -385,7 +361,6 @@ print("Done!")</textarea>
       if (type === "noop") { /* nothing */ }
 
       else if (type === "update") {
-        // flush point
         if (stopOnUpdate) return;
       }
 
@@ -408,28 +383,28 @@ print("Done!")</textarea>
         tracerN = Math.max(0, Math.min(50, Math.round(tracerN)));
         tracerDelayMs = (d === null || d === undefined) ? null : Math.max(0, Math.min(2000, Math.round(d)));
 
-        // If tracer(0,0): manual update mode like desktop turtle
         manualUpdateMode = (tracerN === 0 && (tracerDelayMs === 0 || tracerDelayMs === null));
       }
 
       else if (type === "begin_fill") {
         isFilling = true;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
+        fillPoints = [[x, y]];
       }
 
       else if (type === "end_fill") {
-        if (isFilling){
-          ctx.closePath();
+        if (isFilling && fillPoints && fillPoints.length >= 3){
           ctx.fillStyle = fillColor;
-          ctx.fill();
-          if (penDown){
-            ctx.lineWidth = penSize;
-            ctx.strokeStyle = penColor;
-            ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(fillPoints[0][0], fillPoints[0][1]);
+          for (let i = 1; i < fillPoints.length; i++){
+            ctx.lineTo(fillPoints[i][0], fillPoints[i][1]);
           }
+          ctx.closePath();
+          ctx.fill();
         }
         isFilling = false;
+        fillPoints = null;
       }
 
       else if (type === "home") {
@@ -439,9 +414,9 @@ print("Done!")</textarea>
 
       else if (type === "clear") {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // don't reset styles; turtle.clear() keeps pen settings
         x = cx(); y = cy(); angle = 0;
         isFilling = false;
+        fillPoints = null;
       }
 
       else if (type === "goto") {
@@ -459,9 +434,8 @@ print("Done!")</textarea>
     }
   }
 
-  // Expose a flush function that Python can call (for update/clear animation)
+  // Flush helper used by Python-side update()/clear()
   window._cc_flush = async () => {
-    // run until first update marker, then stop (so update() controls frames)
     await runQueueUntilUpdateOrEnd(true);
   };
 
@@ -473,11 +447,9 @@ print("Done!")</textarea>
       statusEl.textContent = "Loading Python…";
       pyodide = await loadPyodide();
 
-      // Output bridge
       window._cc_append = (s) => appendOut(String(s));
       window._cc_input = (promptText) => (window.prompt(String(promptText ?? "")) || "");
 
-      // Redirect Python stdout/stderr + input()
       pyodide.runPython(`
 import sys, js, builtins
 
@@ -491,7 +463,6 @@ sys.stderr = _CCWriter()
 builtins.input = lambda prompt="": js._cc_input(prompt)
       `.trim());
 
-      // Register turtle JS module
       pyodide.registerJsModule("cc_turtle", {
         update,
         hideturtle,
@@ -535,11 +506,9 @@ import sys, importlib, js
 _t = importlib.import_module("cc_turtle")
 sys.modules["turtle"] = _t
 
-# Make update() flush immediately (so time.sleep animations work)
 def update():
     js._cc_flush()
 
-# Make clear() also flush (so frames swap cleanly)
 def clear():
     _t.clear()
     js._cc_flush()
@@ -585,10 +554,8 @@ globals().update({
 })
       `.trim());
 
-      // Run pupil code (it will call update()/clear() which flushes frames)
       await pyodide.runPythonAsync(codeEl.value);
 
-      // After Python finishes, flush any remaining queued commands to the end
       statusEl.textContent = "Drawing…";
       await runQueueUntilUpdateOrEnd(false);
 
