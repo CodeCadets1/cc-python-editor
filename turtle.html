@@ -41,7 +41,7 @@
       font-size: 14px;
       box-shadow: 0 0 0 1px rgba(255,255,255,0.06) inset;
 
-      /* IMPORTANT: override defaults to fix huge line gaps */
+      /* IMPORTANT: override defaults */
       line-height: 1.25;
     }
 
@@ -50,7 +50,7 @@
       color: #e9eef7;
     }
 
-    /* Reduce extra vertical padding that makes line 2 drop */
+    /* Reduce extra vertical padding */
     .cm-s-ccbook .CodeMirror-lines { padding: 8px 0; }
 
     /* Force internal <pre> + line boxes to obey our line height */
@@ -88,10 +88,7 @@
     .cm-s-ccbook .cm-number  { color: #ffd479; }
     .cm-s-ccbook .cm-comment { color: #a7b0c0; opacity: 0.75; }
 
-    /* ✅ Make imported module names green (ebook style)
-       - 'from turtle import *' => turtle green
-       - 'import time' => time green
-    */
+    /* ✅ Make imported module names green (ebook style) */
     .cm-s-ccbook .cm-keyword + .cm-variable,
     .cm-s-ccbook .cm-keyword + .cm-builtin {
       color: #4cff9b;
@@ -100,6 +97,23 @@
     /* Catch common Python mode classifications for imports */
     .cm-s-ccbook span.cm-builtin {
       color: #4cff9b;
+    }
+
+    /* =============================
+       FINAL FIX: kill phantom line gaps
+       (CodeMirror adds spacing via internal wrappers)
+       ============================= */
+    .cm-s-ccbook .CodeMirror-code { line-height: 1.25 !important; }
+
+    .cm-s-ccbook .CodeMirror-code > div {
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+
+    .cm-s-ccbook .CodeMirror pre {
+      line-height: 1.25 !important;
+      min-height: 0 !important;
+      margin: 0 !important;
     }
 
     /* =============================
