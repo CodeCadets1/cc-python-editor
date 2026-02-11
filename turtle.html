@@ -5,7 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Code Cadets Turtle</title>
 
+  <!-- Pyodide -->
   <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+
+  <!-- CodeMirror (syntax highlighting + line numbers) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
 
   <style>
     body { margin:0; padding:14px; font-family:system-ui; }
@@ -23,24 +29,48 @@
       gap: 14px;
     }
 
-    textarea {
-      width: 100%;
+    /* ---------- Editor wrapper (keeps your existing sizing) ---------- */
+    .CodeMirror {
       height: 280px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 14px;
-      padding: 12px;
       border-radius: 12px;
       box-sizing: border-box;
 
-      /* Dark editor look */
+      /* Match your current dark editor panel */
       background: #0f172a;
-      color: #e5e7eb;
       border: 1px solid #1e293b;
-      caret-color: #38bdf8;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
     }
 
-    textarea::selection { background: #2563eb; color: white; }
-    textarea:focus { outline: none; border-color: #38bdf8; }
+    /* Cursor + selection (match your textarea) */
+    .CodeMirror-cursor { border-left: 2px solid #38bdf8 !important; }
+    .CodeMirror-selected { background: #2563eb !important; }
+
+    /* ---------- “Match ebook style” keyword colours ----------
+       These are tuned to the screenshot vibe: pink keywords, green names, light text.
+       If your exact ebook colours differ, tell me the hex values and I’ll swap them. */
+    .cm-s-ccbook.CodeMirror { color: #e5e7eb; background: #0f172a; }
+    .cm-s-ccbook .cm-keyword { color: #f472b6; }      /* pink keywords */
+    .cm-s-ccbook .cm-def { color: #34d399; }          /* green function/class names */
+    .cm-s-ccbook .cm-variable { color: #e5e7eb; }     /* normal identifiers */
+    .cm-s-ccbook .cm-variable-2 { color: #a7f3d0; }   /* secondary vars */
+    .cm-s-ccbook .cm-builtin { color: #60a5fa; }      /* builtins */
+    .cm-s-ccbook .cm-number { color: #fde68a; }       /* numbers */
+    .cm-s-ccbook .cm-string { color: #a7f3d0; }       /* strings */
+    .cm-s-ccbook .cm-comment { color: #94a3b8; }      /* comments */
+    .cm-s-ccbook .cm-operator { color: #e5e7eb; }
+    .cm-s-ccbook .cm-meta { color: #e5e7eb; }
+
+    /* Line number gutter styling */
+    .cm-s-ccbook .CodeMirror-gutters {
+      background: #0b1224;
+      border-right: 1px solid #1e293b;
+      border-top-left-radius: 12px;
+      border-bottom-left-radius: 12px;
+    }
+    .cm-s-ccbook .CodeMirror-linenumber {
+      color: #64748b;
+    }
 
     canvas { background:#fff; border:1px solid #ccc; border-radius:10px; }
 
@@ -79,9 +109,12 @@
 
   <div id="layout">
     <div>
-     <textarea id="code" spellcheck="false">from turtle import *</textarea>
+      <!-- Keep textarea for CodeMirror to enhance -->
+      <textarea id="code" spellcheck="false">from turtle import *</textarea>
+
       <div id="toolbar">
         <button id="run" disabled>Run</button>
+        <button id="toggleLines" class="secondary" disabled>Line numbers: ON</button>
         <button id="clearCanvas" class="secondary">Clear canvas</button>
         <button id="clearOut" class="secondary">Clear output</button>
         <span id="status">Loading Python…</span>
@@ -106,9 +139,31 @@
   const errEl = document.getElementById("err");
 
   const runBtn = document.getElementById("run");
+  const toggleLinesBtn = document.getElementById("toggleLines");
   const clearCanvasBtn = document.getElementById("clearCanvas");
   const clearOutBtn = document.getElementById("clearOut");
   const codeEl = document.getElementById("code");
+
+  // ---------- CodeMirror setup ----------
+  const editor = CodeMirror.fromTextArea(codeEl, {
+    mode: "python",
+    theme: "ccbook",
+    lineNumbers: true,
+    indentUnit: 2,
+    tabSize: 2,
+    viewportMargin: Infinity
+  });
+
+  // Make sure our custom theme class is applied
+  editor.getWrapperElement().classList.add("cm-s-ccbook");
+
+  let lineNumbersOn = true;
+  toggleLinesBtn.onclick = () => {
+    lineNumbersOn = !lineNumbersOn;
+    editor.setOption("lineNumbers", lineNumbersOn);
+    toggleLinesBtn.textContent = `Line numbers: ${lineNumbersOn ? "ON" : "OFF"}`;
+    editor.refresh();
+  };
 
   // ---------- Output wiring ----------
   const appendOut = (t) => { outEl.textContent += String(t); };
@@ -139,12 +194,10 @@
   let tracerN = 1;           // turtle.tracer(n, delay) - if n==0, we still keep minimal animation
   let tracerDelayMs = null;
 
-  // If tracer(0,0) is used, many tutorials call update() to show frames.
   // We'll respect update() as a "flush marker" by inserting an UPDATE command into the queue.
   let queue = [];
 
   function applyCanvasBackground(){
-    // fill background first, then drawings occur above it
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
     ctx.fillStyle = bgColor;
@@ -165,13 +218,11 @@
     ctx.strokeStyle = penColor;
     ctx.fillStyle = fillColor;
 
-    // redraw background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     applyCanvasBackground();
   }
 
   function clearCanvasAll(){
-    // "Clear canvas" button: reset everything including background
     bgColor = "#ffffff";
     resetTurtle(true);
   }
@@ -188,7 +239,7 @@
 
   function forward(dist){ q("forward", Number(dist) || 0); }
   function backward(dist){ q("forward", -(Number(dist) || 0)); }
-  function back(dist){ backward(dist); } // important alias
+  function back(dist){ backward(dist); }
 
   function left(deg){ q("left", Number(deg) || 0); }
   function right(deg){ q("right", Number(deg) || 0); }
@@ -196,7 +247,6 @@
   function penup(){ q("penup"); }
   function pendown(){ q("pendown"); }
 
-  // Aliases commonly used in tutorials
   function pu(){ penup(); }
   function pd(){ pendown(); }
   function fd(d){ forward(d); }
@@ -215,7 +265,6 @@
 
   function goto_(tx, ty){ q("goto", [Number(tx) || 0, Number(ty) || 0]); }
 
-  // dot(size=None, color=None)
   function dot(size, c){
     q("dot", {
       size: (size === undefined || size === null) ? 10 : Number(size) || 10,
@@ -223,10 +272,8 @@
     });
   }
 
-  // bgcolor(color)
   function bgcolor(c){ q("bgcolor", c); }
 
-  // circle(radius, extent=360, steps=None)
   function circle(radius, extent, steps){
     q("circle", {
       radius: Number(radius) || 0,
@@ -245,15 +292,10 @@
   }
 
   function home(){ q("home"); }
-
-  // clear() should behave like turtle.clear() (clears drawings but keeps settings/background)
   function clear_(){ q("clear"); }
 
-  // Screen() minimal stub so code using Screen().bgcolor(...) doesn't crash
   function Screen(){
-    return {
-      bgcolor: (c) => bgcolor(c)
-    };
+    return { bgcolor: (c) => bgcolor(c) };
   }
 
   // ---------- Coordinate helpers ----------
@@ -261,7 +303,6 @@
   function toCanvasY(ty){ return cy() - ty; }
 
   function maybeDelay(stepIndex){
-    // Keep visible animation even if tracer(0,0) is used
     const effectiveTracer = (tracerN === 0 ? 1 : tracerN);
     const effectiveDelay = (tracerDelayMs !== null) ? tracerDelayMs : delayMs;
 
@@ -341,14 +382,12 @@
   }
 
   function applySpeed(s){
-    // Rough mapping: 0 fastest, 10 fast, 1 slow (but keep a minimum so kids see motion)
     const n = Number.isFinite(s) ? Math.max(0, Math.min(10, Math.round(s))) : 3;
     if (n === 0) delayMs = 2;
     else delayMs = Math.max(1, 32 - (n * 3));
   }
 
   // ---------- Queue runner ----------
-  // Runs commands; if stopOnUpdate=true it stops right AFTER seeing an "update" marker.
   async function runQueue(stopOnUpdate){
     while (queue.length){
       const [type, value] = queue.shift();
@@ -406,7 +445,6 @@
       }
 
       else if (type === "clear") {
-        // turtle.clear(): clear drawings but keep background and pen settings
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         applyCanvasBackground();
         x = cx(); y = cy(); angle = 0;
@@ -415,7 +453,6 @@
 
       else if (type === "bgcolor") {
         bgColor = String(value ?? bgColor);
-        // Apply immediately (like screen background)
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         applyCanvasBackground();
       }
@@ -449,9 +486,7 @@
     }
   }
 
-  // JS flush function that Python calls to show animation frames during tracer(0)/update loops
   window._cc_flush = async () => {
-    // Run until first update marker, then stop (so update() controls frames)
     await runQueue(true);
   };
 
@@ -463,11 +498,9 @@
       statusEl.textContent = "Loading Python…";
       pyodide = await loadPyodide();
 
-      // Output bridge
       window._cc_append = (s) => appendOut(String(s));
       window._cc_input = (promptText) => (window.prompt(String(promptText ?? "")) || "");
 
-      // Redirect Python stdout/stderr + input()
       pyodide.runPython(`
 import sys, js, builtins
 
@@ -481,31 +514,24 @@ sys.stderr = _CCWriter()
 builtins.input = lambda prompt="": js._cc_input(prompt)
       `.trim());
 
-      // Register turtle JS module
       pyodide.registerJsModule("cc_turtle", {
-        // core
         update,
         forward, backward, back, left, right,
         penup, pendown, pu, pd, fd, bk, rt, lt,
 
-        // styling + fill
         pencolor, color, pensize, width,
         fillcolor, begin_fill, end_fill,
 
-        // positioning + shapes
         goto: goto_,
         circle,
         dot,
 
-        // speed + tracer
         speed,
         tracer,
 
-        // screen + background
         Screen,
         bgcolor,
 
-        // misc
         home,
         clear: clear_,
         hideturtle,
@@ -513,6 +539,7 @@ builtins.input = lambda prompt="": js._cc_input(prompt)
       });
 
       runBtn.disabled = false;
+      toggleLinesBtn.disabled = false;
       statusEl.textContent = "Ready";
     } catch (e){
       statusEl.textContent = "Failed to load Python";
@@ -528,38 +555,29 @@ builtins.input = lambda prompt="": js._cc_input(prompt)
     outEl.textContent = "";
 
     try{
-      // reset drawing but keep background for this run
       resetTurtle(true);
       queue = [];
 
-      // IMPORTANT: NO vars(_t) ANYWHERE.
-      // We explicitly map names so from turtle import * works.
       pyodide.runPython(`
 import sys, importlib, js
 _t = importlib.import_module("cc_turtle")
 sys.modules["turtle"] = _t
 
-# Make update() create a frame boundary + flush queued work up to that point.
 def update():
-    _t.update()        # queue an "update" marker
-    js._cc_flush()     # run until marker, then stop
+    _t.update()
+    js._cc_flush()
 
-# Make clear() queue a clear + flush so animations swap frames cleanly.
 def clear():
     _t.clear()
     js._cc_flush()
 
-# Publish our update/clear overrides into the turtle module
 _t.update = update
 _t.clear = clear
 
-# Publish names into globals so tutorials can call forward(100) etc.
 globals().update({
-  # frame control
   "update": update,
   "clear": clear,
 
-  # movement + aliases
   "forward": _t.forward,
   "backward": _t.backward,
   "back": _t.back,
@@ -572,13 +590,11 @@ globals().update({
   "goto": _t.goto,
   "home": _t.home,
 
-  # pen control
   "penup": _t.penup,
   "pendown": _t.pendown,
   "pu": _t.pu,
   "pd": _t.pd,
 
-  # styling
   "pencolor": _t.pencolor,
   "color": _t.color,
   "pensize": _t.pensize,
@@ -587,28 +603,22 @@ globals().update({
   "begin_fill": _t.begin_fill,
   "end_fill": _t.end_fill,
 
-  # shapes
   "circle": _t.circle,
   "dot": _t.dot,
 
-  # speed/tracer
   "speed": _t.speed,
   "tracer": _t.tracer,
 
-  # screen/background
   "Screen": _t.Screen,
   "bgcolor": _t.bgcolor,
 
-  # misc
   "hideturtle": _t.hideturtle,
   "showturtle": _t.showturtle,
 })
       `.trim());
 
-      // Run pupil code (it can call update()/clear() which flushes frames)
-      await pyodide.runPythonAsync(codeEl.value);
+      await pyodide.runPythonAsync(editor.getValue());
 
-      // After Python finishes, flush any remaining queued commands to the end
       statusEl.textContent = "Drawing…";
       await runQueue(false);
 
@@ -620,7 +630,6 @@ globals().update({
     }
   };
 
-  // Start up
   resetTurtle(false);
   main();
 </script>
